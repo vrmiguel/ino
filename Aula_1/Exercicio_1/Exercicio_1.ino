@@ -9,7 +9,7 @@ int State = 0;
 
 unsigned long previousMillis = 0;
 
-const long interval = 100000;
+const long interval = 1000;
 
 
 void setup() {
