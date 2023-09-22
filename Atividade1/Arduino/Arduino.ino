@@ -7,6 +7,7 @@ const int echoPin = 4;
 const int ledPin = 7;
 const int MEASURE_COUNT = 4;
 
+bool ledState = HIGH;
 u32 led_last_toggled_at = 0;
 const int LED_TOGGLE_INTERVAL_MS = 1000;
 
@@ -47,30 +48,47 @@ float measures[MEASURE_COUNT];
 
 void loop() {
   u32 ms = millis();
-  if (ms - sonar_last_fired_at >= SONAR_FIRE_INTERVAL_MS) {
-    startSonar();
 
-    float read = sonarRead();
+  if (should_light_led) {
+    if (ms - led_last_toggled_at >= LED_TOGGLE_INTERVAL_MS) {
+      ledState = !ledState;
+      digitalWrite(ledPin, ledState);
+      led_last_toggled_at = ms;
+    }
+  } else if (ledState) {
+      ledState = LOW;
+      digitalWrite(ledPin, ledState);
+  }
 
-    if (loopIdx == MEASURE_COUNT) {
-      float sum = 0;
-      int i;
-      for (i = 0; i < MEASURE_COUNT; i++) {
-        sum += measures[i];
+
+    if (ms - sonar_last_fired_at >= SONAR_FIRE_INTERVAL_MS) {
+      startSonar();
+
+      float read = sonarRead();
+
+      if (loopIdx == MEASURE_COUNT) {
+        float sum = 0;
+        int i;
+        for (i = 0; i < MEASURE_COUNT; i++) {
+          sum += measures[i];
+        }
+
+        float avg = sum / MEASURE_COUNT;
+        Serial.print("Media movel: ");
+        Serial.println(avg);
+
+        // Ligue o LED caso a distância média for acima de 500cm
+        should_light_led = avg >= 50.0;
+
+        Serial.print("should_light_led: ");
+        Serial.println(should_light_led);
+
+
+        loopIdx = 0;
+      } else {
+        measures[loopIdx++] = read;
       }
 
-      float avg = sum / MEASURE_COUNT;
-      Serial.print("Media movel: ");
-      Serial.println(avg);
-
-      // Ligue o LED caso a distância média for acima de 500cm
-      should_light_led = avg >= 500.0;
-
-      loopIdx = 0;
-    } else {
-      measures[loopIdx++] = read;
+      sonar_last_fired_at = ms;
     }
-
-    sonar_last_fired_at = ms;
   }
-}
