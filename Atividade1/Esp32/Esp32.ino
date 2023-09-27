@@ -49,6 +49,7 @@ void loop() {
   const u32 now = millis();
   if (now - touch_last_read_at >= TOUCH_READ_INTERVAL_MS) {
     touch_last_read_at = now;
+
     if (got_touched()) {
       consecutive_touches += 1;
     } else {

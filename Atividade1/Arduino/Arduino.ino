@@ -65,10 +65,11 @@ void loop() {
       led_last_toggled_at = ms;
     }
   } else if (ledState) {
+    // Se estamos aqui, então should_light_led == false
+    // Se o LED ainda está aceso, portanto, o mesmo deverá ser apagado
     ledState = LOW;
     digitalWrite(ledPin, ledState);
   }
-
 
   if (ms - sonar_last_fired_at >= SONAR_FIRE_INTERVAL_MS) {
     startSonar();
@@ -95,7 +96,7 @@ void loop() {
       // Ligue o LED caso a distância média for acima de distance_threshold_cm
       should_light_led = avg >= distance_threshold_cm;
 
-      Serial.print("should_light_led: ");
+      Serial.print("Devemos acender o LED?: ");
       Serial.println(should_light_led);
 
       loopIdx = 0;
