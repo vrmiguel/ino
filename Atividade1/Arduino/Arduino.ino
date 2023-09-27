@@ -4,8 +4,11 @@
 
 const int trigPin = 2;
 const int echoPin = 4;
-const int ledPin = 7;
+const int ledPin = LED_BUILTIN;
 const int MEASURE_COUNT = 4;
+
+const int esp32_input_gpio = 7;
+const int esp32_output_gpio = 5;
 
 bool ledState = HIGH;
 u32 led_last_toggled_at = 0;
@@ -17,6 +20,10 @@ bool should_light_led = false;
 
 void setup() {
   Serial.begin(9600);
+
+  pinMode(esp32_output_gpio, OUTPUT);
+
+  pinMode(esp32_input_gpio, INPUT);
 
   pinMode(ledPin, OUTPUT);
   pinMode(trigPin, OUTPUT);
@@ -56,39 +63,53 @@ void loop() {
       led_last_toggled_at = ms;
     }
   } else if (ledState) {
-      ledState = LOW;
-      digitalWrite(ledPin, ledState);
+    ledState = LOW;
+    digitalWrite(ledPin, ledState);
   }
 
 
-    if (ms - sonar_last_fired_at >= SONAR_FIRE_INTERVAL_MS) {
-      startSonar();
+  if (ms - sonar_last_fired_at >= SONAR_FIRE_INTERVAL_MS) {
+    startSonar();
 
-      float read = sonarRead();
+    float read = sonarRead();
 
-      if (loopIdx == MEASURE_COUNT) {
-        float sum = 0;
-        int i;
-        for (i = 0; i < MEASURE_COUNT; i++) {
-          sum += measures[i];
-        }
+    if (digitalRead(esp32_input_gpio) == HIGH) {
+      Serial.println("ESP32 pediu status do SR-HC04");
+      const int to_send = read >= 50.0 ? HIGH : LOW;
+      digitalWrite(esp32_output_gpio, to_send);
+    }
 
-        float avg = sum / MEASURE_COUNT;
-        Serial.print("Media movel: ");
-        Serial.println(avg);
-
-        // Ligue o LED caso a distância média for acima de 500cm
-        should_light_led = avg >= 50.0;
-
-        Serial.print("should_light_led: ");
-        Serial.println(should_light_led);
-
-
-        loopIdx = 0;
-      } else {
-        measures[loopIdx++] = read;
+    if (loopIdx == MEASURE_COUNT) {
+      float sum = 0;
+      int i;
+      for (i = 0; i < MEASURE_COUNT; i++) {
+        sum += measures[i];
       }
 
-      sonar_last_fired_at = ms;
+      float avg = sum / MEASURE_COUNT;
+      Serial.print("Media movel: ");
+      Serial.println(avg);
+
+      // Ligue o LED caso a distância média for acima de 500cm
+      should_light_led = avg >= 50.0;
+
+      Serial.print("should_light_led: ");
+      Serial.println(should_light_led);
+
+
+      loopIdx = 0;
+    } else {
+      measures[loopIdx++] = read;
     }
+
+    sonar_last_fired_at = ms;
   }
+
+  const int esp32in = digitalRead(esp32_input_gpio);
+  Serial.print("Entrada do ESP32: ");
+  Serial.println(esp32in);
+
+  const int esp32out = digitalRead(esp32_output_gpio);
+  Serial.print("Saida do ESP32: ");
+  Serial.println(esp32out);
+}
