@@ -7,6 +7,8 @@ const int echoPin = 4;
 const int ledPin = LED_BUILTIN;
 const int MEASURE_COUNT = 4;
 
+const float distance_threshold_cm = 20.0;
+
 const int esp32_input_gpio = 7;
 const int esp32_output_gpio = 5;
 
@@ -75,7 +77,7 @@ void loop() {
 
     if (digitalRead(esp32_input_gpio) == HIGH) {
       Serial.println("ESP32 pediu status do SR-HC04");
-      const int to_send = read >= 50.0 ? HIGH : LOW;
+      const int to_send = read >= distance_threshold_cm ? HIGH : LOW;
       digitalWrite(esp32_output_gpio, to_send);
     }
 
@@ -90,12 +92,11 @@ void loop() {
       Serial.print("Media movel: ");
       Serial.println(avg);
 
-      // Ligue o LED caso a distância média for acima de 500cm
-      should_light_led = avg >= 50.0;
+      // Ligue o LED caso a distância média for acima de distance_threshold_cm
+      should_light_led = avg >= distance_threshold_cm;
 
       Serial.print("should_light_led: ");
       Serial.println(should_light_led);
-
 
       loopIdx = 0;
     } else {
