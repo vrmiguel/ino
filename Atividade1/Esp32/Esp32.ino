@@ -49,11 +49,11 @@ void loop() {
   const u32 now = millis();
   if (now - touch_last_read_at >= TOUCH_READ_INTERVAL_MS) {
     touch_last_read_at = now;
-
     if (got_touched()) {
       consecutive_touches += 1;
     } else {
       consecutive_touches = 0;
+      digitalWrite(arduino_output_gpio, LOW);
     }
 
     if (consecutive_touches >= 5) {
@@ -62,6 +62,7 @@ void loop() {
       should_read_arduino = true;
       consecutive_touches = 0;
     }
+
 
     Serial.print("Toques consecutivos: ");
     Serial.println(consecutive_touches);

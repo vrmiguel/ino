@@ -106,12 +106,4 @@ void loop() {
 
     sonar_last_fired_at = ms;
   }
-
-  const int esp32in = digitalRead(esp32_input_gpio);
-  Serial.print("Entrada do ESP32: ");
-  Serial.println(esp32in);
-
-  const int esp32out = digitalRead(esp32_output_gpio);
-  Serial.print("Saida do ESP32: ");
-  Serial.println(esp32out);
 }
