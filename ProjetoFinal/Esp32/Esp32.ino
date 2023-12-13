@@ -4,11 +4,27 @@
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
-const char *MQTT_SERVER = "mqtt.thingsboard.cloud";
-const char *MQTT_TOPIC = "v1/devices/me/telemetry";
-const char *MQTT_CLIENT_ID = "wk4ult0143kbgyuwvlgo";
-const char *MQTT_USERNAME = "cyj5dkus0rnsgjl9bl6x";
-const char *MQTT_PASSWORD = "of8jh40a96tc96q2832s";
+/*
+  const int button_pin = 21;
+  const int headlight_led = 1;
+  const int rain_led = 3;
+*/
+
+const int button_pin = 26;
+const int headlight_led = 12;
+const int rain_led = 14;
+
+// Variáveis para tratamento de debounce de botão
+const unsigned int debounce_delay = 5; // ms
+int previous_button_state = LOW;
+int button_state;
+int last_button_press;
+
+int headlight_override = false;
+
+const char *MQTT_SERVER = "broker.hivemq.com";
+const char *MQTT_TOPIC = "iot/uptsi/sensor";
+
 const uint16_t MQTT_PORT = 1883;
 
 const char* ssid = "Crabstation";
@@ -25,9 +41,29 @@ int temperature;
 int luminosity;
 int is_raining;
 int is_near;
+int is_dark = false;
+
+void CallbackMqtt(char* topic, byte* payload, unsigned int length) {
+  if (String(topic) == "iot/uptsi/botao") {
+
+    bool turn_on_headlight = payload[0] == '1';
+
+    payload[length] = '\0';
+    Serial.print("Payload: ");
+    Serial.println(String((char*) payload));
+
+    
+    Serial.print("Recebi mensagem do topico, payload: ");
+    Serial.println(turn_on_headlight);
+
+    if (turn_on_headlight) {
+      headlight_override = !headlight_override;
+    }
+  }
+}
 
 String check_sensor(char sensor) {
-  if(sensor == 'r') {
+  if (sensor == 'r') {
     Serial.print("Sensor de chuva: ");
   } else if (sensor == 'm') {
     Serial.print("Sensor de proximidade: ");
@@ -38,7 +74,7 @@ String check_sensor(char sensor) {
   } else {
     Serial.print("Desconhecido");
   }
-  
+
   String retorno;
 
   Serial2.print(sensor);
@@ -57,10 +93,12 @@ void ConnectToMqtt() {
   Serial.println("Connecting to MQTT Broker...");
   while (!mqttClient.connected()) {
     Serial.print("Conectando ao MQTT, clientID: ");
-    Serial.println(MQTT_CLIENT_ID);
-    if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
+    char clientId[100] = "\0";
+    sprintf(clientId, "ESP32Client-%04X", random(0xffff));
+    if (mqttClient.connect(clientId)) {
       Serial.println("Conectado ao broker MQTT");
       mqttClient.subscribe(MQTT_TOPIC);
+      mqttClient.subscribe("iot/uptsi/botao");
     }
   }
 }
@@ -69,16 +107,19 @@ void setup() {
   Serial.begin(9600);
   Serial2.begin(9600);
 
-  //  /pinMode(led_interno, OUTPUT);
-  // / pinMode(buzzer, OUTPUT);
+  pinMode(headlight_led, OUTPUT);
+  pinMode(rain_led, OUTPUT);
+  pinMode(button_pin, INPUT_PULLDOWN);
 
   WiFi.begin(ssid, password);
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
 
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+  mqttClient.setCallback(CallbackMqtt);
 
   Serial.println("");
   Serial.println("WiFi connected");
@@ -98,10 +139,19 @@ void update_sensors() {
   Serial.print("Valor lido: ");
   Serial.println(luminosity);
 
+  is_dark = luminosity < 500;
+  if (headlight_override || is_dark) {
+    digitalWrite(headlight_led, HIGH);
+  } else {
+    digitalWrite(headlight_led, LOW);
+  }
+
   String rain = check_sensor('r');
   is_raining = rain.toInt();
   Serial.print("Valor lido: ");
   Serial.println(is_raining);
+
+  digitalWrite(rain_led, is_raining ? HIGH : LOW);
 
   String near = check_sensor('m');
   is_near = near.toInt();
@@ -122,10 +172,34 @@ void update_dashboard() {
   mqttClient.publish(MQTT_TOPIC, body);
 
   Serial.println(".. pronto!");
+  free(body);
 }
 
 void loop() {
   int ms = millis();
+
+  const int button_state_read = digitalRead(button_pin);
+  Serial.print("Botao: ");
+  Serial.println(button_state_read);
+  if (button_state_read != previous_button_state) {
+    last_button_press = ms;
+  }
+
+  if (ms - last_button_press > debounce_delay) {
+    if (button_state_read != button_state) {
+      button_state = button_state_read;
+
+      if (button_state == HIGH) {
+        Serial.println("Botao ligado!");
+      } else {
+        Serial.println("Botao desligado!");
+      }
+    }
+  }
+
+  if (button_state_read) {
+    headlight_override = !headlight_override;
+  }
 
   if (ms - last_updated_sensors >= sensor_update_interval) {
     update_sensors();
